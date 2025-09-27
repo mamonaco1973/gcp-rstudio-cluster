@@ -51,7 +51,7 @@ echo "${nfs_server_ip}:/filestore /nfs nfs vers=3,rw,hard,noatime,rsize=65536,ws
 systemctl daemon-reload                              # Reload mount units
 mount /nfs                                           # Mount root NFS
 
-mkdir -p /nfs/home /nfs/data                         # Create standard subdirectories
+mkdir -p /nfs/home /nfs/data /nfs/rlibs              # Create standard subdirectories
 
 # Add /home mapping to NFS (user homes on NFS share)
 echo "${nfs_server_ip}:/filestore/home /home nfs vers=3,rw,hard,noatime,rsize=65536,wsize=65536,timeo=600,_netdev 0 0" \
@@ -214,16 +214,22 @@ sudo echo "%linux-admins ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/10-linux-admi
 sudo sed -i 's/^\(\s*HOME_MODE\s*\)[0-9]\+/\10700/' /etc/login.defs
 
 # Trigger home directory creation for test users (forces mkhomedir execution)
+
+ln -s /nfs /etc/skel/nfs
+
 su -c "exit" rpatel
 su -c "exit" jsmith
 su -c "exit" akumar
 su -c "exit" edavis
 
-# Fix NFS directory ownership + permissions for group collaboration
-chgrp rstudio-users /nfs
-chgrp rstudio-users /nfs/data
-chmod 770 /nfs
-chmod 770 /nfs/data
+# Set NFS directory ownership and permissions
+chgrp ${force_group} /nfs
+chgrp ${force_group} /nfs/data
+chgrp ${force_group} /nfs/rlibs
+
+chmod 2770 /nfs
+chmod 2775 /nfs/rlibs
+chmod 2770 /nfs/data
 chmod 700 /home/*
 
 # Clone helper repo into /nfs and apply group permissions
