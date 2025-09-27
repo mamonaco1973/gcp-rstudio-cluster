@@ -26,7 +26,7 @@ Write-Output "Successfully joined the domain."
 # ------------------------------------------------------------
 
 Write-Output "Add users to the Remote Desktop Users Group"
-$domainGroup = "MCLOUD\mcloud-users"
+$domainGroup = "RSTUDIO\rstudio-users"
 $maxRetries = 10
 $retryDelay = 30
 

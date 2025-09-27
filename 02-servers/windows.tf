@@ -123,7 +123,7 @@ resource "google_compute_instance" "windows_ad_instance" {
   # Automatically runs at first boot to join the Windows VM to the AD domain.
   metadata = {
     windows-startup-script-ps1 = templatefile("./scripts/ad_join.ps1", {
-      domain_fqdn = "mcloud.mikecloud.com"
+      domain_fqdn = "rstudio.mikecloud.com"
       nfs_gateway = google_compute_instance.nfs_gateway_instance.network_interface[0].network_ip
     })
 

@@ -220,17 +220,17 @@ su -c "exit" akumar
 su -c "exit" edavis
 
 # Fix NFS directory ownership + permissions for group collaboration
-chgrp mcloud-users /nfs
-chgrp mcloud-users /nfs/data
+chgrp rstudio-users /nfs
+chgrp rstudio-users /nfs/data
 chmod 770 /nfs
 chmod 770 /nfs/data
 chmod 700 /home/*
 
 # Clone helper repo into /nfs and apply group permissions
 cd /nfs
-git clone https://github.com/mamonaco1973/gcp-filestore.git
-chmod -R 775 gcp-filestore
-chgrp -R mcloud-users gcp-filestore
+git clone https://github.com/mamonaco1973/gcp-rstudio-cluster.git
+chmod -R 775 gcp-rstudio-cluster
+chgrp -R rstudio-users gcp-rstudio-cluster
 
 uptime >> /root/userdata.log 2>&1
 touch "$FLAG_FILE"

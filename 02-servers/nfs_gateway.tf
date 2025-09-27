@@ -123,11 +123,11 @@ resource "google_compute_instance" "nfs_gateway_instance" {
     enable-oslogin = "TRUE" # Enforce OS Login for secure SSH
 
     startup-script = templatefile("./scripts/nfs_gateway_init.sh", {
-      domain_fqdn   = "mcloud.mikecloud.com"
+      domain_fqdn   = "rstudio.mikecloud.com"
       nfs_server_ip = google_filestore_instance.nfs_server.networks[0].ip_addresses[0]
       domain_fqdn   = var.dns_zone
       netbios       = var.netbios
-      force_group   = "mcloud-users"
+      force_group   = "rstudio-users"
       realm         = var.realm
     })
   }
