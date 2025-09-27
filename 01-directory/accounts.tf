@@ -17,7 +17,7 @@
 # ================================================================================================
 # User: Admin
 # ================================================================================================
-# Generates password and stores AD credentials for the `MCLOUD\admin` account.
+# Generates password and stores AD credentials for the `RSTUDIO\admin` account.
 # ================================================================================================
 resource "random_password" "admin_password" {
   length           = 24
@@ -36,7 +36,7 @@ resource "google_secret_manager_secret" "admin_secret" {
 resource "google_secret_manager_secret_version" "admin_secret_version" {
   secret = google_secret_manager_secret.admin_secret.id
   secret_data = jsonencode({
-    username = "MCLOUD\\admin"
+    username = "RSTUDIO\\admin"
     password = random_password.admin_password.result
   })
 }
@@ -45,7 +45,7 @@ resource "google_secret_manager_secret_version" "admin_secret_version" {
 # ================================================================================================
 # User: John Smith
 # ================================================================================================
-# Generates password and stores AD credentials for the `MCLOUD\jsmith` account.
+# Generates password and stores AD credentials for the `RSTUDIO\jsmith` account.
 # ================================================================================================
 resource "random_password" "jsmith_password" {
   length           = 24
@@ -64,7 +64,7 @@ resource "google_secret_manager_secret" "jsmith_secret" {
 resource "google_secret_manager_secret_version" "jsmith_secret_version" {
   secret = google_secret_manager_secret.jsmith_secret.id
   secret_data = jsonencode({
-    username = "MCLOUD\\jsmith"
+    username = "RSTUDIO\\jsmith"
     password = random_password.jsmith_password.result
   })
 }
@@ -73,7 +73,7 @@ resource "google_secret_manager_secret_version" "jsmith_secret_version" {
 # ================================================================================================
 # User: Emily Davis
 # ================================================================================================
-# Generates password and stores AD credentials for the `MCLOUD\edavis` account.
+# Generates password and stores AD credentials for the `RSTUDIO\edavis` account.
 # ================================================================================================
 resource "random_password" "edavis_password" {
   length           = 24
@@ -92,7 +92,7 @@ resource "google_secret_manager_secret" "edavis_secret" {
 resource "google_secret_manager_secret_version" "edavis_secret_version" {
   secret = google_secret_manager_secret.edavis_secret.id
   secret_data = jsonencode({
-    username = "MCLOUD\\edavis"
+    username = "RSTUDIO\\edavis"
     password = random_password.edavis_password.result
   })
 }
@@ -101,7 +101,7 @@ resource "google_secret_manager_secret_version" "edavis_secret_version" {
 # ================================================================================================
 # User: Raj Patel
 # ================================================================================================
-# Generates password and stores AD credentials for the `MCLOUD\rpatel` account.
+# Generates password and stores AD credentials for the `RSTUDIO\rpatel` account.
 # ================================================================================================
 resource "random_password" "rpatel_password" {
   length           = 24
@@ -120,7 +120,7 @@ resource "google_secret_manager_secret" "rpatel_secret" {
 resource "google_secret_manager_secret_version" "rpatel_secret_version" {
   secret = google_secret_manager_secret.rpatel_secret.id
   secret_data = jsonencode({
-    username = "MCLOUD\\rpatel"
+    username = "RSTUDIO\\rpatel"
     password = random_password.rpatel_password.result
   })
 }
@@ -129,7 +129,7 @@ resource "google_secret_manager_secret_version" "rpatel_secret_version" {
 # ================================================================================================
 # User: Amit Kumar
 # ================================================================================================
-# Generates password and stores AD credentials for the `MCLOUD\akumar` account.
+# Generates password and stores AD credentials for the `RSTUDIO\akumar` account.
 # ================================================================================================
 resource "random_password" "akumar_password" {
   length           = 24
@@ -148,7 +148,7 @@ resource "google_secret_manager_secret" "akumar_secret" {
 resource "google_secret_manager_secret_version" "akumar_secret_version" {
   secret = google_secret_manager_secret.akumar_secret.id
   secret_data = jsonencode({
-    username = "MCLOUD\\akumar"
+    username = "RSTUDIO\\akumar"
     password = random_password.akumar_password.result
   })
 }
