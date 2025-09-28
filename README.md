@@ -79,7 +79,7 @@ When the deployment completes, the following resources are created:
   - Autoscaling policies to add/remove RStudio nodes based on CPU utilization  
 
 - **Filestore Storage:**  
-  - Google Cloud Filestore instance providing an NFSv4.1 share  
+  - Google Cloud Filestore instance providing an NFSv3 share  
   - Mounted at `/nfs/rlibs` for shared R libraries and optionally `/nfs/home` for user home directories  
 
 - **File Access Integration:**  
