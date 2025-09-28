@@ -1,80 +1,103 @@
-# Instance Template
-# This resource defines the template used to create instances in the managed instance group.
+# ==========================================================================================
+# Instance Template: RStudio VM
+# ------------------------------------------------------------------------------------------
+# Purpose:
+#   - Defines the template for RStudio VM instances
+#   - Specifies machine type, disk, network, and service account
+#   - Used by the managed instance group for consistent deployments
+# ==========================================================================================
 resource "google_compute_instance_template" "rstudio_template" {
-  name         = "rstudio-template" # Name of the instance template
-  machine_type = "e2-standard-2"    # Machine type specifies the type of virtual machine to use
+  name         = "rstudio-template" # Template name
+  machine_type = "e2-standard-2"    # VM size (2 vCPU, 8 GB RAM)
 
-  # Tags for the VM instances
-  # These tags are used for network firewall rules (e.g., allowing HTTP and SSH traffic)
+  # Tags used for firewall rules (e.g., SSH and RStudio web access)
   tags = ["allow-rstudio"]
 
-  # Disk configuration
+  # ----------------------------------------------------------------------------------------
+  # Disk Configuration
+  # - Uses Packer-built custom image as the boot disk
+  # ----------------------------------------------------------------------------------------
   disk {
-    auto_delete  = true                                                     # Disk will be deleted when the instance is deleted
-    boot         = true                                                     # Marks this disk as the boot disk
-    source_image = data.google_compute_image.rstudio_packer_image.self_link # Uses the Packer-built image
+    auto_delete  = true  # Delete disk when instance is destroyed
+    boot         = true  # Mark as boot disk
+    source_image = data.google_compute_image.rstudio_packer_image.self_link
   }
 
-  # Network configuration
+  # ----------------------------------------------------------------------------------------
+  # Network Configuration
+  # - Attaches instance to VPC and subnet
+  # ----------------------------------------------------------------------------------------
   network_interface {
-    network    = data.google_compute_network.ad_vpc.id       # VPC network reference
-    subnetwork = data.google_compute_subnetwork.ad_subnet.id # Subnet within the VPC
+    network    = data.google_compute_network.ad_vpc.id
+    subnetwork = data.google_compute_subnetwork.ad_subnet.id
   }
 
-  # Service account configuration
+  # ----------------------------------------------------------------------------------------
+  # Service Account
+  # - Grants cloud platform access to the VM
+  # ----------------------------------------------------------------------------------------
   service_account {
-    email  = local.service_account_email                        # Service account email address
-    scopes = ["https://www.googleapis.com/auth/cloud-platform"] # Scopes for API access
+    email  = local.service_account_email
+    scopes = ["https://www.googleapis.com/auth/cloud-platform"]
   }
 }
 
-# Regional Managed Instance Group
-# Defines a managed instance group to automatically manage multiple instances
-resource "google_compute_region_instance_group_manager" "instance_group_manager" {
-  name               = "rstudio-instance-group" # Name of the managed instance group
-  base_instance_name = "rstudio-instance"       # Base name for the instances in the group
-  target_size        = 1                        # Desired number of instances in the group
-  region             = "us-central1"            # Region where the group will be deployed
 
-  # Instance template to use for creating instances
+# ==========================================================================================
+# Regional Managed Instance Group
+# ------------------------------------------------------------------------------------------
+# Purpose:
+#   - Manages multiple instances based on the template
+#   - Ensures scaling and healing policies for high availability
+# ==========================================================================================
+resource "google_compute_region_instance_group_manager" "instance_group_manager" {
+  name               = "rstudio-instance-group"
+  base_instance_name = "rstudio-instance"
+  target_size        = 1
+  region             = "us-central1"
+
+  # Template for creating instances
   version {
     instance_template = google_compute_instance_template.rstudio_template.self_link
   }
 
-  # Named port for the instance group
+  # Named port for load balancing and health checks
   named_port {
-    name = "http" # Name of the port
-    port = 8787   # Port number for the HTTP service
+    name = "http"
+    port = 8787
   }
 
-  # Auto-healing policies
+  # Auto-healing policy based on health checks
   auto_healing_policies {
-    health_check = google_compute_health_check.http_health_check.self_link
-    # Health check resource
-    initial_delay_sec = 300 # Time (in seconds) to wait before checking instance health
+    health_check       = google_compute_health_check.http_health_check.self_link
+    initial_delay_sec  = 300
   }
 }
 
+
+# ==========================================================================================
 # Regional Autoscaler
-# Automatically adjusts the number of instances in the managed instance group
+# ------------------------------------------------------------------------------------------
+# Purpose:
+#   - Adjusts instance count in the managed group
+#   - Scales based on CPU utilization
+# ==========================================================================================
 resource "google_compute_region_autoscaler" "autoscaler" {
-  name   = "rstudio-autoscaler"                                                          # Name of the autoscaler
-  target = google_compute_region_instance_group_manager.instance_group_manager.self_link # Target managed instance group
-  region = "us-central1"                                                                 # Region where the autoscaler operates
+  name   = "rstudio-autoscaler"
+  target = google_compute_region_instance_group_manager.instance_group_manager.self_link
+  region = "us-central1"
 
-  # Autoscaling policy configuration
   autoscaling_policy {
-    max_replicas = 4 # Maximum number of instances
-    min_replicas = 1 # Minimum number of instances
+    max_replicas    = 4  # Upper bound
+    min_replicas    = 1  # Lower bound
+    cooldown_period = 60 # Wait between scale actions
 
-    # Target CPU utilization for scaling
     cpu_utilization {
-      target = 0.6 # Scale based on 60% CPU usage
+      target = 0.6 # Trigger scale at 60% CPU
     }
-
-    cooldown_period = 60 # Time (in seconds) to wait between scaling actions
   }
 }
+
 
 # ==========================================================================================
 # Firewall Rule: Allow RStudio (Web + SSH)
@@ -94,22 +117,27 @@ resource "google_compute_firewall" "allow_rstudio" {
     ports    = ["8787", "22", "80"]
   }
 
-  target_tags   = ["allow-rstudio"] # Apply only to tagged VMs
+  target_tags   = ["allow-rstudio"] # Restrict to tagged instances
   source_ranges = ["0.0.0.0/0"]     # ⚠️ Open internet access (lab only)
 }
 
-# Health Check
-# Monitors the health of instances in the instance group
-resource "google_compute_health_check" "http_health_check" {
-  name                = "http-health-check" # Name of the health check
-  check_interval_sec  = 5                   # Frequency (in seconds) of health checks
-  timeout_sec         = 5                   # Timeout (in seconds) for each health check
-  healthy_threshold   = 2                   # Number of successful checks to mark the instance as healthy
-  unhealthy_threshold = 2                   # Number of failed checks to mark the instance as unhealthy
 
-  # HTTP-specific health check configuration
+# ==========================================================================================
+# Health Check: RStudio Service
+# ------------------------------------------------------------------------------------------
+# Purpose:
+#   - Monitors instance health for the managed group
+#   - Marks instances healthy/unhealthy based on HTTP responses
+# ==========================================================================================
+resource "google_compute_health_check" "http_health_check" {
+  name                = "http-health-check"
+  check_interval_sec  = 5
+  timeout_sec         = 5
+  healthy_threshold   = 2
+  unhealthy_threshold = 2
+
   http_health_check {
-    request_path = "/auth-sign-in" # Path to send health check requests
-    port         = 8787            # Port for the HTTP service
+    request_path = "/auth-sign-in"
+    port         = 8787
   }
 }
