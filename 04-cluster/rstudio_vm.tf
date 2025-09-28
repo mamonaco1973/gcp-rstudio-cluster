@@ -47,6 +47,11 @@ resource "google_compute_instance" "rstudio_vm" {
     force_group   = "rstudio-users"
   })
 
+  service_account {
+    email  = local.service_account_email
+    scopes = ["https://www.googleapis.com/auth/cloud-platform"]
+  }
+  
   # ----------------------------------------------------------------------------------------
   # Firewall Tags
   # - Enables firewall rules to permit access (SSH, RStudio web UI)
