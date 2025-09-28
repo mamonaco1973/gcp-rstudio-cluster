@@ -40,6 +40,16 @@ resource "google_compute_instance_template" "rstudio_template" {
     email  = local.service_account_email
     scopes = ["https://www.googleapis.com/auth/cloud-platform"]
   }
+
+  # ----------------------------------------------------------------------------------------
+  # Add startup script from templatefile
+  # ----------------------------------------------------------------------------------------
+
+  metadata_startup_script = templatefile("./scripts/rstudio_booter.sh", {
+    nfs_server_ip = data.google_filestore_instance.nfs_server.networks[0].ip_addresses[0]
+    domain_fqdn   = var.dns_zone
+    force_group   = "rstudio-users"
+  })
 }
 
 
