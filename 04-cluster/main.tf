@@ -26,12 +26,12 @@ locals {
 ############################################
 
 # Lookup existing VPC by name from the current project
-data "google_compute_network" "packer_vpc" {
+data "google_compute_network" "ad_vpc" {
   name = var.vpc_name  # Dynamically pull the VPC name from input variable
 }
 
 # Lookup existing subnet by name and region
-data "google_compute_subnetwork" "packer_subnet" {
+data "google_compute_subnetwork" "ad_subnet" {
   name   = var.subnet_name   # Dynamically pull subnet name from input variable
   region = "us-central1"     # Region must match the one where subnet is deployed
 }

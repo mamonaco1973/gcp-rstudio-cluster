@@ -31,8 +31,8 @@
 #   # - Creates ephemeral public IP for internet access
 #   # ----------------------------------------------------------------------------------------
 #   network_interface {
-#     network    = data.google_compute_network.packer_vpc.id
-#     subnetwork = data.google_compute_subnetwork.packer_subnet.id
+#     network    = data.google_compute_network.ad_vpc.id
+#     subnetwork = data.google_compute_subnetwork.ad_subnet.id
 
 #     access_config {} # Attach NAT IP for outbound/inbound traffic
 #   }
