@@ -52,7 +52,7 @@ source "googlecompute" "rstudio_build_image" {
 # - Each script installs specific components
 # ------------------------------------------------------------------------------------------
 build {
-  sources = ["source.googlecompute.packer_build_image"]  
+  sources = ["source.googlecompute.rstudio_build_image"]  
 
   # Install base packages and dependencies
   provisioner "shell" {
