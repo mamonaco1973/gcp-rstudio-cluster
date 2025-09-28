@@ -63,7 +63,7 @@ resource "google_compute_instance_template" "rstudio_template" {
 resource "google_compute_region_instance_group_manager" "instance_group_manager" {
   name               = "rstudio-instance-group"
   base_instance_name = "rstudio-instance"
-  target_size        = 1
+  target_size        = 2
   region             = "us-central1"
 
   # Template for creating instances
@@ -98,9 +98,9 @@ resource "google_compute_region_autoscaler" "autoscaler" {
   region = "us-central1"
 
   autoscaling_policy {
-    max_replicas    = 4  # Upper bound
-    min_replicas    = 1  # Lower bound
-    cooldown_period = 60 # Wait between scale actions
+    max_replicas    = 4   # Upper bound
+    min_replicas    = 2   # Lower bound
+    cooldown_period = 300 # Wait between scale actions
 
     cpu_utilization {
       target = 0.6 # Trigger scale at 60% CPU
