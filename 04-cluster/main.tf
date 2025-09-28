@@ -1,50 +1,56 @@
-############################################
-# GOOGLE CLOUD PROVIDER CONFIGURATION
-############################################
-
-# Configures the Google Cloud provider to interact with the specified project
-# Uses a local credentials JSON file to authenticate Terraform operations
-# Ensures that all resources are provisioned under the correct GCP project and identity
+# ==========================================================================================
+# Google Cloud Provider Configuration
+# ------------------------------------------------------------------------------------------
+# Purpose:
+#   - Configures Terraform to interact with Google Cloud
+#   - Authenticates using a local service account credentials file
+#   - Ensures resources are provisioned in the correct GCP project
+# ==========================================================================================
 provider "google" {
-  project     = local.credentials.project_id # Pulls the project ID from the decoded credentials file (ensures dynamic, environment-specific use)
-  credentials = file("../credentials.json")  # Loads raw credentials file from parent directory (assumes file exists and is properly secured)
+  project     = local.credentials.project_id
+  credentials = file("../credentials.json")
 }
 
-############################################
-# LOCAL VARIABLES: CREDENTIALS PARSING
-############################################
 
-# Decodes the service account credentials file into a usable map
-# Extracts useful fields like project ID and service account email for later reference
+# ==========================================================================================
+# Local Variables: Credentials Parsing
+# ------------------------------------------------------------------------------------------
+# Purpose:
+#   - Parses the service account JSON credentials file
+#   - Extracts fields for use across resources (e.g., project ID, email)
+# ==========================================================================================
 locals {
-  credentials           = jsondecode(file("../credentials.json")) # Converts JSON content into a map structure (now accessible via dot notation)
-  service_account_email = local.credentials.client_email          # Explicitly extracts the service account's email (can be used for IAM bindings or audit logs)
+  credentials           = jsondecode(file("../credentials.json"))
+  service_account_email = local.credentials.client_email
 }
 
-############################################
-# DATA SOURCES: EXISTING NETWORK INFRASTRUCTURE
-############################################
 
-# Lookup existing VPC by name from the current project
+# ==========================================================================================
+# Data Sources: Existing Network Infrastructure
+# ------------------------------------------------------------------------------------------
+# Purpose:
+#   - Looks up existing VPC and subnet by name
+#   - Ensures new resources integrate with predefined networking
+# ==========================================================================================
 data "google_compute_network" "ad_vpc" {
-  name = var.vpc_name # Dynamically pull the VPC name from input variable
+  name = var.vpc_name
 }
 
-# Lookup existing subnet by name and region
 data "google_compute_subnetwork" "ad_subnet" {
-  name   = var.subnet_name # Dynamically pull subnet name from input variable
-  region = "us-central1"   # Region must match the one where subnet is deployed
+  name   = var.subnet_name
+  region = "us-central1"
 }
 
-# ----------------------------------------------------------------------------------------------
-# Data Source: Existing Filestore Instance
-# ----------------------------------------------------------------------------------------------
-# This block looks up the Filestore instance created elsewhere.
-# It can then be referenced in variables or resources in this build.
-# ----------------------------------------------------------------------------------------------
 
+# ==========================================================================================
+# Data Source: Existing Filestore Instance
+# ------------------------------------------------------------------------------------------
+# Purpose:
+#   - Retrieves details of an existing Filestore NFS server
+#   - Enables references in VM startup scripts or mounts
+# ==========================================================================================
 data "google_filestore_instance" "nfs_server" {
-  name     = "nfs-server"    # Must match the existing Filestore instance name
-  location = "us-central1-b" # Zone where the Filestore was provisioned
+  name     = "nfs-server"
+  location = "us-central1-b"
   project  = local.credentials.project_id
 }
