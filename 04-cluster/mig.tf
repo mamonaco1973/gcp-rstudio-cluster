@@ -62,7 +62,7 @@ resource "google_compute_instance_template" "rstudio_template" {
 # ==========================================================================================
 resource "google_compute_region_instance_group_manager" "instance_group_manager" {
   name               = "rstudio-instance-group"
-  base_instance_name = "rstudio-instance"
+  base_instance_name = "rstudio"
   target_size        = 2
   region             = "us-central1"
 
