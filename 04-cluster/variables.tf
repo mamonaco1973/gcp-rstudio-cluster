@@ -35,3 +35,44 @@ data "google_compute_image" "rstudio_packer_image" {
   project = local.credentials.project_id       # Use the project ID from the decoded credentials (avoids hardcoding)
 }
 
+
+# --------------------------------------------------------------------------------
+# DNS zone / AD domain (FQDN)
+# Used by Samba AD DC for DNS namespace and domain identity
+# --------------------------------------------------------------------------------
+variable "dns_zone" {
+  description = "AD DNS zone / domain (e.g., rstudio.mikecloud.com)"
+  type        = string
+  default     = "rstudio.mikecloud.com"
+}
+
+# --------------------------------------------------------------------------------
+# Kerberos realm (UPPERCASE)
+# Convention: match dns_zone but uppercase; required by Kerberos config
+# --------------------------------------------------------------------------------
+variable "realm" {
+  description = "Kerberos realm (usually DNS zone in UPPERCASE, e.g., RSTUDIO.MIKECLOUD.COM)"
+  type        = string
+  default     = "RSTUDIO.MIKECLOUD.COM"
+}
+
+# --------------------------------------------------------------------------------
+# NetBIOS short domain name
+# Typically <= 15 characters, uppercase alphanumerics; used by legacy clients and some SMB flows
+# --------------------------------------------------------------------------------
+variable "netbios" {
+  description = "NetBIOS short domain name (e.g., RSTUDIO)"
+  type        = string
+  default     = "RSTUDIO"
+}
+
+# --------------------------------------------------------------------------------
+# User base DN for LDAP
+# --------------------------------------------------------------------------------
+
+variable "user_base_dn" {
+  description = "User base DN for LDAP (e.g., CN=Users,DC=rstudio,DC=mikecloud,DC=com)"
+  type        = string
+  default     = "CN=Users,DC=rstudio,DC=mikecloud,DC=com"
+}
+
