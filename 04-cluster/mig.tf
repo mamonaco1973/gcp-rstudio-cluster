@@ -18,8 +18,8 @@ resource "google_compute_instance_template" "rstudio_template" {
   # - Uses Packer-built custom image as the boot disk
   # ----------------------------------------------------------------------------------------
   disk {
-    auto_delete  = true  # Delete disk when instance is destroyed
-    boot         = true  # Mark as boot disk
+    auto_delete  = true # Delete disk when instance is destroyed
+    boot         = true # Mark as boot disk
     source_image = data.google_compute_image.rstudio_packer_image.self_link
   }
 
@@ -79,8 +79,8 @@ resource "google_compute_region_instance_group_manager" "instance_group_manager"
 
   # Auto-healing policy based on health checks
   auto_healing_policies {
-    health_check       = google_compute_health_check.http_health_check.self_link
-    initial_delay_sec  = 300
+    health_check      = google_compute_health_check.http_health_check.self_link
+    initial_delay_sec = 300
   }
 }
 
