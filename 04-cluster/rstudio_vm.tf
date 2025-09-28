@@ -42,6 +42,7 @@ resource "google_compute_instance" "rstudio_vm" {
   # Pass a startup script to the VM to execute on boot
   # Uses templatefile() to inject dynamic values (e.g., image name) into the script at runtime
   metadata_startup_script = templatefile("./scripts/rstudio_booter.sh", {
+    nfs_server_ip = data.google_filestore_instance.nfs_server.networks[0].ip_addresses[0]
   
   })
 

@@ -35,3 +35,16 @@ data "google_compute_subnetwork" "packer_subnet" {
   name   = var.subnet_name   # Dynamically pull subnet name from input variable
   region = "us-central1"     # Region must match the one where subnet is deployed
 }
+
+# ----------------------------------------------------------------------------------------------
+# Data Source: Existing Filestore Instance
+# ----------------------------------------------------------------------------------------------
+# This block looks up the Filestore instance created elsewhere.
+# It can then be referenced in variables or resources in this build.
+# ----------------------------------------------------------------------------------------------
+
+data "google_filestore_instance" "nfs_server" {
+  name     = "nfs-server"      # Must match the existing Filestore instance name
+  location = "us-central1-b"   # Zone where the Filestore was provisioned
+  project  = local.credentials.project_id
+}
