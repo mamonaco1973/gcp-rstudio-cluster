@@ -51,7 +51,7 @@
 #     email  = local.service_account_email
 #     scopes = ["https://www.googleapis.com/auth/cloud-platform"]
 #   }
-  
+
 #   # ----------------------------------------------------------------------------------------
 #   # Firewall Tags
 #   # - Enables firewall rules to permit access (SSH, RStudio web UI)
