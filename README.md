@@ -1,61 +1,20 @@
-# GCP Mini Active Directory with Filestore: SMB & NFS File Sharing
+# GCP RStudio Cluster with Filestore-Backed Shared Libraries  
 
-This project extends the original **GCP Mini Active Directory** lab by integrating **Filestore** as a managed shared storage backend. Instead of relying only on local disks or standalone file servers, this solution demonstrates how to expose Filestore storage in two ways:  
+This project extends the original **GCP Mini Active Directory** lab by deploying an **RStudio Server cluster** on Google Cloud Platform. The cluster is designed for data science and analytics workloads, where multiple users need a scalable, domain-joined environment with consistent package management.  
 
-1. **Direct NFS Mounts on Linux Clients** – Linux machines joined to the mini-AD domain mount Filestore via the NFS 3.0 or 4.1 protocol for scalable, POSIX-compliant storage.  
-2. **SMB Access via NFS Gateway** – Windows machines joined to the mini-AD domain connect to a Samba-based NFS gateway, which translates NFS exports from Filestore into SMB shares, enabling Active Directory authentication and group-based access.  
+![RStudio](rstudio.png)  
 
-The mini-AD environment (Samba 4 on Ubuntu) provides Active Directory authentication and DNS services. Filestore provides fully managed NFS storage tiers with flexible performance and capacity options. Together, they enable a hybrid setup where both Linux and Windows domain-joined clients can consume GCP-native storage seamlessly.  
+Instead of relying only on per-user libraries stored on ephemeral VM disks, this solution integrates **Google Cloud Filestore** as a shared package and data backend. This allows RStudio nodes in a **Managed Instance Group (MIG)** to mount a common NFS share, ensuring that installed R packages and project files are accessible across all nodes.  
 
-![GCP diagram](gcp-filestore.png)
+### Key capabilities demonstrated:  
 
-## ☁️ Filestore Service Tiers Overview
+1. **RStudio Server Cluster with Global HTTP Load Balancer** – RStudio Server (Open Source Edition) deployed across multiple Compute Engine instances, fronted by a GCP global HTTP(S) load balancer for high availability and seamless user access.  
+2. **Filestore-Backed Shared Library** – Filestore NFS share mounted at `/nfs/rlibs` and injected into `.libPaths()`, enabling shared R package storage across the cluster.  
+3. **Mini Active Directory Integration** – A Samba-based mini-AD domain controller provides authentication and DNS, so RStudio logins are domain-based and centrally managed.  
 
-**Filestore** is Google Cloud’s managed **NFS** (Network Attached Storage): a shared file system exposed over NFS to your VMs and GKE clusters without you needing to run a fileserver yourself. You are billed for **provisioned capacity** (not used bytes), can scale capacity, and choose tiers based on your needs for cost, performance, and availability.
+Together, this architecture provides a reproducible, cloud-native RStudio environment where users get both personal home-directory libraries and access to a shared, scalable package repository.  
 
----
-
-### ⚙️ Capacity Ranges (Min → Max)
-
-| Tier | Minimum Size | Maximum Size | Scaling Increments | Location Type |
-| :--- | :--- | :--- | :--- | :--- |
-| **Basic HDD** | **1 TiB** | **63.9 TiB** | 1 GiB (Up only) | Zonal |
-| **Basic SSD** | **2.5 TiB** | **63.9 TiB** | 1 GiB (Up only) | Zonal |
-| **Zonal** | **1 TiB** | **100 TiB** | 256 GiB or 2.5 TiB | Zonal |
-| **Regional** | **1 TiB** | **100 TiB** | 256 GiB or 2.5 TiB | Regional |
-| **Enterprise** | **1 TiB** | **10 TiB** (per instance) | 256 GiB (Up or down) | Regional |
-| *Enterprise Multishare* | 1 TiB | Up to 80 shares (up to **320 TiB** total capacity) | 256 GiB | Regional |
-
----
-
-### 🔒 NFS Protocol Support
-
-| Tier | NFSv3 | NFSv4.1 | Key Differentiator |
-| :--- | :--- | :--- | :--- |
-| **Basic HDD/SSD** | ✅ Yes | ❌ No | Simplicity, compatibility (NFSv3 only) |
-| **Zonal** | ✅ Yes | ✅ Yes | Highest Zonal performance and NFSv4.1 features. |
-| **Regional** | ✅ Yes | ✅ Yes | Regional redundancy (high availability) with NFSv4.1 features. |
-| **Enterprise** | ✅ Yes | ✅ Yes | Highest availability (**multi-zone redundancy**) for mission-critical apps and NFSv4.1 features. |
-
----
-
-### 💰 Minimal Deploy Size: Cost Comparison (Illustrative)
-
-> These are illustrative monthly costs based on the minimum instance size and *approximate* public pricing for a typical US region (e.g., `us-central1`). **Actual costs vary by region.**
-
-| Tier | Availability | **Minimum capacity** | **Approx $/GiB-month** | **Est. monthly @ min size** |
-| :--- | :--- | :---: | :---: | :---: |
-| **Basic HDD** | Zonal | **1 TiB** | ~**$0.20** | ~**$204.80** |
-| **Basic SSD** | Zonal | **2.5 TiB** | ~$0.30 | ~$768.00 |
-| **Zonal** (Default perf) | Zonal | **1 TiB** | ~**$0.28** | ~**$286.72** |
-| **Regional** (Default perf) | Regional | **1 TiB** | ~$0.45 | ~$460.80 |
-| **Enterprise** | Regional | **1 TiB** | ~$0.45 | ~$460.80 |
-
-#### Key Cost Notes:
-
-* **Custom Performance (Zonal/Regional):** Selecting **Custom Performance** lowers the $/GiB-month charge but introduces two new hourly fees: a **per-instance hourly charge** and a **per-IOPS hourly charge**. The total cost will depend on the custom IOPS you provision.
-* **Basic Tiers:** The Basic tiers (HDD/SSD) often have a **per-GiB rate AND an hourly instance fee**, which is factored into the approximate blended $/GiB-month rate shown above.
-* **NFSv4.1:** To utilize features like **Kerberos/Active Directory integration** and stronger security, you must select **Zonal, Regional, or Enterprise**. Basic tiers are **NFSv3-only**.
+![GCP RStudio Cluster](gcp-rstudio-cluster.png)  
 
 ## Prerequisites
 
@@ -65,13 +24,17 @@ The mini-AD environment (Samba 4 on Ubuntu) provides Active Directory authentica
 
 If this is your first time watching our content, we recommend starting with this video: [GCP + Terraform: Easy Setup](https://youtu.be/3spJpYX4f7I). It provides a step-by-step guide to properly configure Terraform, Packer, and the gcloud CLI.
 
+## Build WorkFlow
+
+![Build WorkFlow](build-workflow.png)
+
 ## Download this Repository  
 
 Clone the repository from GitHub and move into the project directory:  
 
 ```bash
-git clone https://github.com/mamonaco1973/gcp-filestore.git
-cd gcp-filestore
+git clone https://github.com/mamonaco1973/gcp-rstudio-cluster.git
+cd gcp-rstudio-cluster
 ```  
 
 ---
@@ -81,7 +44,7 @@ cd gcp-filestore
 Run [check_env](check_env.sh) to validate your environment, then run [apply](apply.sh) to provision the infrastructure.  
 
 ```bash
-develop-vm:~/gcp-file-store$ ./apply.sh
+develop-vm:~/gcp-rstudio-cluster$ ./apply.sh
 NOTE: Validating that required commands are in PATH.
 NOTE: gcloud is found in the current PATH.
 NOTE: terraform is found in the current PATH.
@@ -91,99 +54,140 @@ NOTE: Successfully authenticated with GCP.
 Initializing provider plugins...
 Terraform has been successfully initialized!
 ```  
-## Build Results
+## Build Results  
 
-When the deployment completes, the following resources are created:
+When the deployment completes, the following resources are created:  
 
-- **Networking**
-  - A **custom-mode VPC** with dedicated subnets for the domain controller, the NFS gateway, and client VMs
-  - **Firewall rules** for required AD/DC ports (e.g., 53 DNS, 88 Kerberos, 123 NTP, 135/445 RPC/SMB, dynamic RPC range) and **NFS (2049)** from trusted subnets to Filestore / gateway
-  - Internal DNS resolution provided by the Samba DC (with forwarders as configured)
+- **Networking:**  
+  - A custom VPC with dedicated subnets for Active Directory, MIG cluster nodes, and bastion host  
+  - Bastion host for secure RDP/SSH access (optional)  
+  - Route tables and firewall rules configured for outbound internet access, AD lookups, and Filestore access  
 
-- **Security & Identity**
-  - **Secret Manager** entries for administrator and user credentials
-  - **Service accounts** and IAM bindings (least-privilege) for Compute Engine and Filestore access
-  - Required **Google APIs enabled** (Compute, Filestore, Secret Manager, etc.)
+- **Security & Identity:**  
+  - Firewall rules scoped to domain controller, MIG nodes, and NFS gateway  
+  - Google Secret Manager entries for administrator and user credentials  
+  - Service accounts and IAM roles for MIG instances to securely fetch secrets  
 
-- **Active Directory Server**
-  - An **Ubuntu** Compute Engine VM running **Samba 4** as Domain Controller and DNS
-  - Configured **Kerberos realm** and **NetBIOS** name
-  - Administrator credentials stored in **Secret Manager**
-  - **User/group bootstrap** via Terraform template: `01-directory/scripts/users.json.template`
+- **Active Directory Server:**  
+  - Ubuntu VM running Samba 4 as Domain Controller and DNS server  
+  - Configured Kerberos realm and NetBIOS name for authentication  
+  - Administrator credentials securely stored in Secret Manager  
 
-- **Shared Storage (Filestore)**
-  - A **Filestore instance** with an exported share (e.g., `filestore`)
-  - Mount target reachable from the NFS gateway and (optionally) Linux clients
-  - Mounted on the gateway (e.g., `/nfs`) with POSIX ownership/permissions applied by init scripts
+- **RStudio Cluster (MIG):**  
+  - Linux Managed Instance Group (MIG) hosting RStudio Server nodes built from a Packer-generated custom image  
+  - Global HTTP(S) Load Balancer providing public access, load balancing, health checks, and optional session affinity  
+  - Autoscaling policies to add/remove RStudio nodes based on CPU utilization  
 
-- **Client & Gateway Instances**
-  - **NFS Gateway (Linux):** Ubuntu VM **joined to the domain**, mounts Filestore, and **re-exports as SMB** via Samba for Windows clients  
-    - Bootstrapped by: `02-servers/scripts/nfs_gateway_init.sh`
-  - **Windows Client:** Windows Server VM **auto-joined to the domain** at first boot  
-    - Bootstrapped by: `02-servers/scripts/ad_join.ps1`
-  - Both paths authenticate against the **mini-AD** domain (Linux via NSS/SSSD + Kerberos, Windows via native AD)
+- **Filestore Storage:**  
+  - Google Cloud Filestore instance providing an NFSv4.1 share  
+  - Mounted at `/nfs/rlibs` for shared R libraries and optionally `/nfs/home` for user home directories  
 
+- **File Access Integration:**  
+  - RStudio MIG instances mount the Filestore NFS share for shared R libraries and project data  
+  - A Linux gateway can optionally expose the same Filestore backend via Samba for Windows clients  
+  - This provides a unified storage backend across Linux (NFS) and Windows (SMB) clients  
 
+- **Sample R Workloads:**  
+  - Example R scripts (Monte Carlo, bell curve, surface plotting, etc.) included to validate the environment  
 
 ## Users and Groups
 
-As part of this project a set of **users** and **groups** are automatically created through a scripted process. These resources are intended for **testing and demonstration purposes**, showcasing how to automate user and group provisioning in a mini Active Directory environment.
+The domain controller provisions **sample users and groups** via Terraform templates. These are intended for testing and demonstration.  
 
-### Groups Created
+### Groups Created  
 
-| Group Name    | Group Category | Group Scope | gidNumber |
-|----------------|----------------|----------------|------------|
-| mcloud-users   | Security       | Universal     | 10001 |
-| india          | Security       | Universal     | 10002 |
-| us             | Security       | Universal     | 10003 |
-| linux-admins   | Security       | Universal     | 10004 |
+| Group Name    | Category  | Scope     | gidNumber |
+|---------------|-----------|----------|-----------|
+| rstudio-users  | Security  | Universal | 10001 |
+| india         | Security  | Universal | 10002 |
+| us            | Security  | Universal | 10003 |
+| linux-admins  | Security  | Universal | 10004 |
+| rstudio-admins  | Security  | Universal | 10004 |
 
-### Users Created and Group Memberships
+### Users Created  
 
 | Username | Full Name   | uidNumber | gidNumber | Groups Joined                    |
-|---------|------------|-----------|-----------|----------------------|
-| jsmith  | John Smith  | 10001 | 10001 | mcloud-users, us, linux-admins |
-| edavis  | Emily Davis | 10002 | 10001 | mcloud-users, us |
-| rpatel  | Raj Patel   | 10003 | 10001 | mcloud-users, india, linux-admins |
-| akumar  | Amit Kumar  | 10004 | 10001 | mcloud-users, india |
-
----
+|----------|-------------|-----------|-----------|----------------------------------|
+| jsmith   | John Smith  | 10001     | 10001     | rstudio-users, us, linux-admins, rstudio-admins  |
+| edavis   | Emily Davis | 10002     | 10001     | rstudio-users, us                 |
+| rpatel   | Raj Patel   | 10003     | 10001     | rstudio-users, india, linux-admins, rstudio-admins|
+| akumar   | Amit Kumar  | 10004     | 10001     | rstudio-users, india              |
 
 
 ### Understanding `uidNumber` and `gidNumber` for Linux Integration
 
 The **`uidNumber`** (User ID) and **`gidNumber`** (Group ID) attributes are critical when integrating **Active Directory** with **Linux systems**, particularly in environments where **SSSD** ([System Security Services Daemon](https://sssd.io/)) or similar services are used for identity management. These attributes allow Linux hosts to recognize and map Active Directory users and groups into the **POSIX** (Portable Operating System Interface) user and group model.
 
+### Creating a New RStudio User
 
-### Log into Windows Instance  
+Follow these steps to provision a new user in the Active Directory domain and validate their access to the RStudio cluster:
 
-After the Windows instance boots, the [startup script](02-servers/scripts/ad_join.ps1) executes which does the following tasks   
+1. **Connect to the Domain Controller**  
+   - Log into the **`win-ad`** server via **Bastion**
+   - Use the `rpatel` or `jsmith` credentials that were provisioned during cluster deployment.  
 
-- Install Active Directory Administrative Tools   
-- Join EC2 Instance to Active Directory  
-- Grant RDP Access  
-- Final System Reboot  
+2. **Launch Active Directory Users and Computers (ADUC)**  
+   - From the Windows Start menu, open **“Active Directory Users and Computers.”**  
+   - Enable **Advanced Features** under the **View** menu. This ensures you can access the extended attribute tabs (e.g., UID/GID mappings).  
 
-Administrator credentials are stored in the `admin_ad_credentials` secret.
+3. **Navigate to the Users Organizational Unit (OU)**  
+   - In the left-hand tree, expand the domain (e.g., `rstudio.mikecloud.com`).  
+   - Select the **Users** OU where all cluster accounts are managed.  
 
-![Windows VM Instance](windows.png)
+4. **Create a New User Object**  
+   - Right-click the Users OU and choose **New → User.**  
+   - Provide the following:  
+     - **Full Name:** Descriptive user name (e.g., “Mike Cloud”).  
+     - **User Logon Name (User Principal Name / UPN):** e.g., `mcloud@rstudio.mikecloud.com`.  
+     - **Initial Password:** Set an initial password.
 
-### Log into Linux Instance  
+![Windows](windows.png)
 
-When the Linux instance boots, the [startup script](02-servers/scripts/nfs_gateway.sh) runs the following tasks:  
+5. **Assign a Unique UID Number**  
+   - Open **PowerShell** on the AD server.  
+   - Run the script located at:  
+     ```powershell
+     Z:\nfs\gcp-rstudio-cluster\06-utils\getNextUID.bat
+     ```  
+   - This script returns the next available **`uidNumber`** to assign to the new account.  
 
-- Update OS and install required packages  
-- Join the Active Directory domain with SSSD  
-- Enable password authentication for AD users  
-- Configure SSSD for AD integration  
-- Grant sudo privileges to the `linux-admins` group  
-- Configure instance as a Samba file gateway to NFS
+6. **Configure Advanced Attributes**  
+   - In the new user’s **Properties** dialog, open the **Attribute Editor** tab.  
+   - Set the following values:  
+     - `gidNumber` → **10001** (the shared GID for the `rstudio-users` group).  
+     - `uid` → match the user’s AD login ID (e.g., `rpatel`).  
+     - `uidNumber` → the unique numeric value returned from `getNextUID.ps1`.  
 
-Linux user credentials are stored as secrets.
+7. **Add Group Memberships**  
+   - Go to the **Member Of** tab.  
+   - Add the user to the following groups:  
+     - **rstudio-users** → grants standard RStudio access.  
+     - **us** (or other geographic/departmental group as applicable).  
 
-![Linux VM Instance](linux.png) 
+8. **Validate User on Linux**  
+   - Open an **Bastion** session to the **`nfs-gateway`** instance.  
+   - Run the following command to confirm the user’s identity mapping:  
+     ```bash
+     id mcloud
+     ```  
+   - Verify that the output shows the correct **UID**, **GID**, and group memberships (e.g., `rstudio-users`).  
 
-## Clean Up  
+![Linux](linux.png)
+
+9. **Validate RStudio Access**  
+   - Open the RStudio cluster’s Application Gateway's URL in a browser (e.g., `http://rstudio-cluster-xxxxx.centralus.cloudapp.azure.com/`).  
+   - Log in with the new AD credentials.  
+
+10. **Verify Permissions**  
+   - By default, the new user is **not** a member of the `rstudio-admin` group.  
+   - Attempting to install packages into the **shared library path `/nfs/rlibs`** should fail with a **“Permission denied”** error.  
+   - This confirms the user is restricted to installing packages in their **personal user library** only.  
+
+---
+
+✅ **Note:** If you need the user to have administrative rights (e.g., the ability to install packages into the shared library), add them to the **rstudio-admin** group in addition to `rstudio-users`.
+
+### Clean Up  
 
 When finished, remove all resources with:  
 
@@ -191,8 +195,4 @@ When finished, remove all resources with:
 ./destroy.sh
 ```  
 
-This uses Terraform to delete the VPC, Compute Engine instances, firewall rules, Secret Manager entries, and any other resources created by this project.  
-
----
-
-⚠️ **Reminder:** This project is for **labs and development only**. Do not use it in production.  
+This uses Terraform to delete the VNet, VMs, Key Vault, storage accounts, NSGs, and secrets.  
