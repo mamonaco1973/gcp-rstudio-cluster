@@ -1,5 +1,16 @@
 #!/bin/bash
 
+FLAG_FILE="/root/.rstudio_provisioned"
+
+#--------------------------------------------------------------------
+# Prevent infinite loop from happening.
+#--------------------------------------------------------------------
+
+if [ -f "$FLAG_FILE" ]; then
+  echo "Provisioning already completed — skipping." >> /root/userdata.log 2>&1
+  exit 0
+fi
+
 # ---------------------------------------------------------------------------------
 # Section 1: Mount NFS file system
 # ---------------------------------------------------------------------------------
@@ -25,10 +36,12 @@ mount /home                                          # Mount /home from NFS
 # ---------------------------------------------------------------------------------
 # Section 2: Join Active Directory Domain
 # ---------------------------------------------------------------------------------
-az login --identity --allow-no-subscriptions
-secretsJson=$(az keyvault secret show --name admin-ad-credentials --vault-name ${vault_name} --query value -o tsv)
-admin_password=$(echo "$secretsJson" | jq -r '.password')
-admin_username="Admin"
+
+# Pull AD admin credentials from GCP Secret Manager
+
+secretValue=$(gcloud secrets versions access latest --secret="admin-ad-credentials")
+admin_password=$(echo $secretValue | jq -r '.password')      # Extract password
+admin_username=$(echo $secretValue | jq -r '.username' | sed 's/.*\\//') # Extract username w/o domain
 
 # Join the Active Directory domain using the `realm` command.
 # - ${domain_fqdn}: The fully qualified domain name (FQDN) of the AD domain.
@@ -103,3 +116,6 @@ chgrp rstudio-admins /nfs/rlibs
 # =================================================================================
 # End of Script
 # =================================================================================
+
+uptime >> /root/userdata.log 2>&1
+touch "$FLAG_FILE"
