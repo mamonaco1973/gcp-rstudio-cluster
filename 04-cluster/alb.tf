@@ -25,6 +25,9 @@ resource "google_compute_backend_service" "backend_service" {
 
   timeout_sec           = 10
   load_balancing_scheme = "EXTERNAL"
+  
+  session_affinity      = "GENERATED_COOKIE"
+  affinity_cookie_ttl_sec = 86400 # 1 day
 
   backend {
     group          = google_compute_region_instance_group_manager.instance_group_manager.instance_group
