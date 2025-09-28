@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e  # Exit immediately on any unhandled command failure
+
 # Run the environment check script to ensure required environment variables, tools, or configurations are present.
 ./check_env.sh
 if [ $? -ne 0 ]; then
@@ -35,6 +37,18 @@ terraform init
 terraform apply -auto-approve
 
 # Return to the parent directory once server provisioning is complete.
+cd ..
+
+# Phase 3 of the build - Build the RStudio image
+
+project_id=$(jq -r '.project_id' "./credentials.json")
+gcloud auth activate-service-account --key-file="./credentials.json" > /dev/null 2> /dev/null
+export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/credentials.json"
+
+cd 03-packer
+packer build \
+  -var="project_id=$project_id" \
+  rstudio_image.pkr.hcl
 cd ..
 
 ./validate.sh
