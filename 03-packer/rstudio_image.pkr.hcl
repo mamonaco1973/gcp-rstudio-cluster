@@ -40,7 +40,7 @@ source "googlecompute" "rstudio_build_image" {
   ssh_username          = "ubuntu"                # Specify the SSH username
   machine_type          = "e2-standard-2"            
 
-  image_name            = "rstudio_image_${local.timestamp}" 
+  image_name            = "rstudio-image-${local.timestamp}" 
                                                   # Use local.timestamp directly
   image_family          = "rstudio-images"        # Image family to group related images
   disk_size             = 20                      # Disk size in GB
