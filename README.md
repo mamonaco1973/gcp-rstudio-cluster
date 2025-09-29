@@ -37,7 +37,6 @@ git clone https://github.com/mamonaco1973/gcp-rstudio-cluster.git
 cd gcp-rstudio-cluster
 ```  
 
----
 
 ## Build the Code  
 
@@ -59,8 +58,7 @@ Terraform has been successfully initialized!
 When the deployment completes, the following resources are created:  
 
 - **Networking:**  
-  - A custom VPC with dedicated subnets for Active Directory, MIG cluster nodes, and bastion host  
-  - Bastion host for secure RDP/SSH access (optional)  
+  - A custom VPC with dedicated subnets for Active Directory, MIG cluster nodes, and NFS Gateway.  
   - Route tables and firewall rules configured for outbound internet access, AD lookups, and Filestore access  
 
 - **Security & Identity:**  
@@ -123,7 +121,7 @@ The **`uidNumber`** (User ID) and **`gidNumber`** (Group ID) attributes are crit
 Follow these steps to provision a new user in the Active Directory domain and validate their access to the RStudio cluster:
 
 1. **Connect to the Domain Controller**  
-   - Log into the **`win-ad`** server via **Bastion**
+   - Log into the **`win-ad-xxxx`** server via a *RDP** client
    - Use the `rpatel` or `jsmith` credentials that were provisioned during cluster deployment.  
 
 2. **Launch Active Directory Users and Computers (ADUC)**  
@@ -165,7 +163,7 @@ Follow these steps to provision a new user in the Active Directory domain and va
      - **us** (or other geographic/departmental group as applicable).  
 
 8. **Validate User on Linux**  
-   - Open an **Bastion** session to the **`nfs-gateway`** instance.  
+   - Open an **SSH** session to the **`nfs-gateway-xxxx`** instance.  
    - Run the following command to confirm the user’s identity mapping:  
      ```bash
      id mcloud
@@ -175,7 +173,7 @@ Follow these steps to provision a new user in the Active Directory domain and va
 ![Linux](linux.png)
 
 9. **Validate RStudio Access**  
-   - Open the RStudio cluster’s Application Gateway's URL in a browser (e.g., `http://rstudio-cluster-xxxxx.centralus.cloudapp.azure.com/`).  
+   - Open the RStudio cluster’s Application Gateway's URL in a browser (e.g., `http://34.173.20.15/`).  
    - Log in with the new AD credentials.  
 
 10. **Verify Permissions**  
@@ -194,5 +192,3 @@ When finished, remove all resources with:
 ```bash
 ./destroy.sh
 ```  
-
-This uses Terraform to delete the VNet, VMs, Key Vault, storage accounts, NSGs, and secrets.  
