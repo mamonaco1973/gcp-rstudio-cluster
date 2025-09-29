@@ -121,7 +121,7 @@ The **`uidNumber`** (User ID) and **`gidNumber`** (Group ID) attributes are crit
 Follow these steps to provision a new user in the Active Directory domain and validate their access to the RStudio cluster:
 
 1. **Connect to the Domain Controller**  
-   - Log into the **`win-ad-xxxx`** server via a *RDP** client
+   - Log into the **`win-ad-xxxx`** server via a **RDP** client
    - Use the `rpatel` or `jsmith` credentials that were provisioned during cluster deployment.  
 
 2. **Launch Active Directory Users and Computers (ADUC)**  
