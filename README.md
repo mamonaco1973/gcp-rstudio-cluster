@@ -21,6 +21,7 @@ Together, this architecture provides a reproducible, cloud-native RStudio enviro
 * [A Google Cloud Account](https://console.cloud.google.com/)
 * [Install gcloud CLI](https://cloud.google.com/sdk/docs/install) 
 * [Install Latest Terraform](https://developer.hashicorp.com/terraform/install)
+* [Install Latest Packer](https://developer.hashicorp.com/packer/install)
 
 If this is your first time watching our content, we recommend starting with this video: [GCP + Terraform: Easy Setup](https://youtu.be/3spJpYX4f7I). It provides a step-by-step guide to properly configure Terraform, Packer, and the gcloud CLI.
 
