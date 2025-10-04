@@ -33,6 +33,13 @@ resource "google_compute_backend_service" "backend_service" {
     group          = google_compute_region_instance_group_manager.instance_group_manager.instance_group
     balancing_mode = "UTILIZATION" # Balance traffic by utilization
   }
+
+   depends_on = [time_sleep.wait_for_healthcheck]
+}
+
+resource "time_sleep" "wait_for_healthcheck" {
+  depends_on      = [google_compute_health_check.http_health_check]
+  create_duration = "30s"
 }
 
 
