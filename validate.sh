@@ -97,4 +97,10 @@ echo ""
 
 printf "%-28s %s\n" "NOTE: NFS Gateway Host:" "${NFS_IP:-<not found>}"
 printf "%-28s %s\n" "NOTE: Windows RDP Host:" "${WIN_IP:-<not found>}"
+
+echo ""
+
 printf "%-28s %s\n" "NOTE: RStudio URL:"      "http://${RSTUDIO_LB_IP}"
+
+echo ""
+
