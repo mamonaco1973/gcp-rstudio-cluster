@@ -75,9 +75,9 @@ export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/credentials.json"
 
 cd 03-packer
 
-packer build \
-  -var="project_id=$project_id" \
-  rstudio_image.pkr.hcl
+# packer build \
+#   -var="project_id=$project_id" \
+#   rstudio_image.pkr.hcl
 
 cd ..
 

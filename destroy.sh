@@ -38,6 +38,7 @@ terraform destroy \
 
 cd ..
 
+exit 0 
 
 # ==============================================================================
 # Phase 2: Custom Image Cleanup
