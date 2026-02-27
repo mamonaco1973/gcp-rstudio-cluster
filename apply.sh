@@ -69,7 +69,7 @@ cd ..
 
 project_id=$(jq -r '.project_id' "./credentials.json") # Extract project ID
 
-gcloud auth activate-service-account \                 # Authenticate service account
+gcloud auth activate-service-account \                 
   --key-file="./credentials.json" > /dev/null 2> /dev/null
 
 export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/credentials.json"
