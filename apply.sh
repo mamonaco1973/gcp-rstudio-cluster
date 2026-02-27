@@ -1,19 +1,22 @@
 #!/bin/bash
-# ==========================================================================================
+# ==============================================================================
 # Build Pipeline Script: Mini-AD + RStudio Cluster on GCP
-# ------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # Purpose:
-#   - Orchestrates multi-phase deployment using Terraform and Packer
-#   - Ensures environment validation before execution
-#   - Builds Active Directory, servers, custom RStudio image, and cluster
-# ==========================================================================================
+#   - Orchestrate multi-phase deployment using Terraform and Packer
+#   - Validate environment before execution
+#   - Deploy AD, servers, image, and auto-scaling cluster
+# ==============================================================================
 
-set -e  # Exit immediately on any unhandled command failure
+set -e  # Exit immediately on unhandled command failure
 
-# ------------------------------------------------------------------------------------------
+
+# ==============================================================================
 # Phase 0: Environment Check
-# - Runs a helper script to verify required environment variables, tools, and configs
-# ------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# Purpose:
+#   - Validate required tools, variables, and configuration
+# ==============================================================================
 
 ./check_env.sh
 if [ $? -ne 0 ]; then
@@ -22,60 +25,70 @@ if [ $? -ne 0 ]; then
 fi
 
 
-# ------------------------------------------------------------------------------------------
+# ==============================================================================
 # Phase 1: Active Directory Deployment
-# - Provisions Samba-based Active Directory using Terraform
-# ------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# Purpose:
+#   - Provision Samba-based Active Directory with Terraform
+# ==============================================================================
+
 cd 01-directory
 
-terraform init                # Initialize Terraform providers and backend
-terraform apply -auto-approve # Apply configuration without manual approval
+terraform init                # Initialize providers and backend
+terraform apply -auto-approve # Deploy AD infrastructure
 
 if [ $? -ne 0 ]; then
   echo "ERROR: Terraform apply failed in 01-directory. Exiting."
   exit 1
 fi
 
-cd .. # Return to project root
+cd ..
 
-# ------------------------------------------------------------------------------------------
+
+# ==============================================================================
 # Phase 2: Server Deployment
-# - Provisions Windows and Linux clients joined to Active Directory
-# ------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# Purpose:
+#   - Provision Windows and Linux servers joined to AD
+# ==============================================================================
 
 cd 02-servers
 
-terraform init                # Initialize Terraform for server provisioning
-terraform apply -auto-approve # Deploy server infrastructure
+terraform init                # Initialize Terraform
+terraform apply -auto-approve # Deploy server resources
 
-cd .. # Return to project root
+cd ..
 
 
-# ------------------------------------------------------------------------------------------
+# ==============================================================================
 # Phase 3: RStudio Image Build
-# - Builds a custom Compute Engine image with RStudio using Packer
-# ------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# Purpose:
+#   - Build custom Compute Engine image using Packer
+# ==============================================================================
 
-project_id=$(jq -r '.project_id' "./credentials.json")
+project_id=$(jq -r '.project_id' "./credentials.json") # Extract project ID
 
-# Authenticate with service account from credentials file
-gcloud auth activate-service-account \
+gcloud auth activate-service-account \                 # Authenticate service account
   --key-file="./credentials.json" > /dev/null 2> /dev/null
 
-# Export path for Google credentials (used by Packer)
 export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/credentials.json"
 
 cd 03-packer
+
 packer build \
   -var="project_id=$project_id" \
   rstudio_image.pkr.hcl
-cd .. # Return to project root
+
+cd ..
 
 
-# ------------------------------------------------------------------------------------------
+# ==============================================================================
 # Phase 4: RStudio Cluster Deployment
-# - Provisions auto-scaling cluster of RStudio servers from Phase 3 image
-# ------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# Purpose:
+#   - Deploy auto-scaling RStudio cluster using latest image
+# ==============================================================================
 
 rstudio_image=$(gcloud compute images list \
   --filter="name~'^rstudio-image' AND family=rstudio-images" \
@@ -84,7 +97,7 @@ rstudio_image=$(gcloud compute images list \
   --format="value(name)")
 
 if [[ -z "$rstudio_image" ]]; then
-  echo "ERROR: No latest image found for 'rstudio-image' in family 'rstudio-images'."
+  echo "ERROR: No latest image found in family 'rstudio-images'."
   exit 1
 fi
 
@@ -95,11 +108,14 @@ terraform apply \
   -var="rstudio_image_name=$rstudio_image" \
   -auto-approve
 
-cd .. # Return to project root
+cd ..
 
 
-# ------------------------------------------------------------------------------------------
+# ==============================================================================
 # Phase 5: Validation
-# - Runs post-deployment validation checks to confirm successful setup
-# ------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# Purpose:
+#   - Run post-deployment validation checks
+# ==============================================================================
+
 ./validate.sh

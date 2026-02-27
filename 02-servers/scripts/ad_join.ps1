@@ -12,7 +12,7 @@ Install-WindowsFeature -Name GPMC,RSAT-AD-PowerShell,RSAT-AD-AdminCenter,RSAT-AD
 # Join instance to active directory
 # ------------------------------------------------------------
 
-$secretJson = gcloud secrets versions access latest --secret="admin-ad-credentials"
+$secretJson = gcloud secrets versions access latest --secret="admin-ad-credentials-rstudio"
 $secretObject = $secretJson | ConvertFrom-Json
 $password = $secretObject.password | ConvertTo-SecureString -AsPlainText -Force
 $username = $secretObject.username

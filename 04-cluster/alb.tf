@@ -1,22 +1,34 @@
-# ==========================================================================================
-# Static Global IP Address
-# ------------------------------------------------------------------------------------------
+# ==============================================================================
+# HTTP Load Balancer: Global IP, Backend Service, URL Map, Proxy, Forwarding Rule
+# ------------------------------------------------------------------------------
 # Purpose:
-#   - Reserves a global static IP address for the HTTP load balancer
-#   - Ensures IP remains consistent even after LB updates or recreation
-# ==========================================================================================
+#   - Reserve static global IP for HTTP load balancer
+#   - Route HTTP/80 to backend service via URL map and target proxy
+#   - Distribute traffic to RStudio instance group with health checks
+# ==============================================================================
+
+
+# ==============================================================================
+# Static Global IP Address
+# ------------------------------------------------------------------------------
+# Purpose:
+#   - Reserve global static IP for HTTP load balancer
+#   - Keep IP stable across LB updates or recreation
+# ==============================================================================
+
 resource "google_compute_global_address" "lb_ip" {
   name = "rstudio-lb-ip"
 }
 
 
-# ==========================================================================================
+# ==============================================================================
 # Backend Service
-# ------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # Purpose:
-#   - Manages traffic distribution to the RStudio instance group
-#   - Uses health checks to verify backends before routing traffic
-# ==========================================================================================
+#   - Define backend service for RStudio instance group
+#   - Use health checks to gate traffic to healthy backends
+# ==============================================================================
+
 resource "google_compute_backend_service" "backend_service" {
   name          = "rstudio-backend-service"
   protocol      = "HTTP"
@@ -31,11 +43,19 @@ resource "google_compute_backend_service" "backend_service" {
 
   backend {
     group          = google_compute_region_instance_group_manager.instance_group_manager.instance_group
-    balancing_mode = "UTILIZATION" # Balance traffic by utilization
+    balancing_mode = "UTILIZATION" # Balance by utilization
   }
 
-   depends_on = [time_sleep.wait_for_healthcheck]
+  depends_on = [time_sleep.wait_for_healthcheck]
 }
+
+
+# ==============================================================================
+# Delay: Wait for Health Check
+# ------------------------------------------------------------------------------
+# Purpose:
+#   - Allow health check to become active before backend service is used
+# ==============================================================================
 
 resource "time_sleep" "wait_for_healthcheck" {
   depends_on      = [google_compute_health_check.http_health_check]
@@ -43,38 +63,41 @@ resource "time_sleep" "wait_for_healthcheck" {
 }
 
 
-# ==========================================================================================
+# ==============================================================================
 # URL Map
-# ------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # Purpose:
-#   - Routes incoming HTTP requests to the backend service
-#   - Default rule sends all traffic to RStudio backend
-# ==========================================================================================
+#   - Route incoming requests to backend service
+#   - Default sends all traffic to RStudio backend
+# ==============================================================================
+
 resource "google_compute_url_map" "url_map" {
   name            = "rstudio-alb"
   default_service = google_compute_backend_service.backend_service.self_link
 }
 
 
-# ==========================================================================================
+# ==============================================================================
 # Target HTTP Proxy
-# ------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # Purpose:
-#   - Creates HTTP proxy that directs traffic to the URL map
-# ==========================================================================================
+#   - Terminate HTTP and forward to URL map
+# ==============================================================================
+
 resource "google_compute_target_http_proxy" "http_proxy" {
   name    = "rstudio-http-proxy"
   url_map = google_compute_url_map.url_map.id
 }
 
 
-# ==========================================================================================
+# ==============================================================================
 # Global Forwarding Rule
-# ------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # Purpose:
-#   - Defines entry point for HTTP traffic on port 80
-#   - Directs requests to HTTP proxy using static global IP
-# ==========================================================================================
+#   - Expose HTTP/80 entry point using static global IP
+#   - Forward traffic to target HTTP proxy
+# ==============================================================================
+
 resource "google_compute_global_forwarding_rule" "forwarding_rule" {
   name       = "rstudio-http-forwarding-rule"
   ip_address = google_compute_global_address.lb_ip.address

@@ -1,27 +1,26 @@
-# ================================================================================================
+# ==============================================================================
 # Google Cloud Provider Configuration
-# ================================================================================================
-# Configures the Google Cloud provider for Terraform.
-#
-# Key Points:
-#   - Uses service account credentials stored in `../credentials.json`.
-#   - Project ID and service account email are extracted from the JSON file.
-# ================================================================================================
+# ------------------------------------------------------------------------------
+# Purpose:
+#   - Configure Google provider for Terraform
+#   - Load service account credentials from external JSON
+# ==============================================================================
+
 provider "google" {
-  project     = local.credentials.project_id # Project ID from decoded credentials
-  credentials = file("../credentials.json")  # Path to service account JSON
+  project     = local.credentials.project_id      # Project ID from credentials JSON
+  credentials = file("../credentials.json")       # Path to service account JSON file
 }
 
-# ================================================================================================
+
+# ==============================================================================
 # Local Variables
-# ================================================================================================
-# Decodes the credentials file for reuse across modules.
-#
-# Key Points:
-#   - `credentials` stores the full JSON as a map.
-#   - `service_account_email` references the service account identity.
-# ================================================================================================
+# ------------------------------------------------------------------------------
+# Purpose:
+#   - Decode credentials file once
+#   - Expose service account email for reuse across modules
+# ==============================================================================
+
 locals {
-  credentials           = jsondecode(file("../credentials.json"))
-  service_account_email = local.credentials.client_email
+  credentials           = jsondecode(file("../credentials.json")) # Decoded JSON map
+  service_account_email = local.credentials.client_email          # Service account identity
 }

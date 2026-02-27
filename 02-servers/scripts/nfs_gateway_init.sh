@@ -65,7 +65,7 @@ mount /home                                          # Mount /home from NFS
 # ---------------------------------------------------------------------------------
 
 # Pull AD admin credentials from GCP Secret Manager
-secretValue=$(gcloud secrets versions access latest --secret="admin-ad-credentials")
+secretValue=$(gcloud secrets versions access latest --secret="admin-ad-credentials-rstudio")
 admin_password=$(echo $secretValue | jq -r '.password')      # Extract password
 admin_username=$(echo $secretValue | jq -r '.username' | sed 's/.*\\//') # Extract username w/o domain
 

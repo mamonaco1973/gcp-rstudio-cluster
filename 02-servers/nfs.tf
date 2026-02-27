@@ -1,71 +1,57 @@
-# ================================================================================================
-# Google Cloud Filestore (Basic NFS Server) with Firewall Rules
-# ================================================================================================
-# Provisions a Filestore instance for NFS storage and secures access via a firewall rule.
+# ==============================================================================
+# Google Cloud Filestore (Basic NFS) and Firewall
+# ------------------------------------------------------------------------------
+# Purpose:
+#   - Provision Filestore instance for NFS storage
+#   - Secure access with firewall rule on port 2049
 #
-# Key Points:
-#   - Filestore provides fully managed NFS storage in GCP.
-#   - Minimum size = 1 TB (1024 GiB).
-#   - Instance is deployed in a specific zone (not region-wide).
-#   - Basic tiers (HDD or SSD) support only NFSv3.
-#   - NFS access allowed on port 2049 (TCP + UDP).
-#   - Source range is open to 0.0.0.0/0 for lab use; restrict in production.
-# ================================================================================================
+# Notes:
+#   - Basic tiers support NFSv3 only
+#   - Minimum size for Basic = 1024 GiB (1 TB)
+#   - 0.0.0.0/0 used for lab only; restrict in production
+# ==============================================================================
+
 resource "google_filestore_instance" "nfs_server" {
 
-  # ----------------------------------------------------------------------------------------------
   # Filestore Configuration
-  # ----------------------------------------------------------------------------------------------
-  # - Name must be unique within the project.
-  # - Tier determines performance and pricing. Options:
-  #     BASIC_HDD, BASIC_SSD  (NFSv3 only)
-  #     HIGH_SCALE_SSD, ENTERPRISE (NFSv3 + NFSv4.1)
-  # - Location must be a zone (e.g., us-central1-b), not just a region.
-  # - Project ID is pulled from local credentials.
-  name     = "nfs-server"
-  tier     = "BASIC_HDD"     # Reverted to Basic HDD
-  location = "us-central1-b" # Zonal, not regional
+  # - Tier controls performance and pricing
+  # - Location must be zonal (e.g., us-central1-b)
+  name     = "rstudio-nfs-server"
+  tier     = "BASIC_HDD"     # Basic HDD (NFSv3)
+  location = "us-central1-b" # Zonal deployment
   project  = local.credentials.project_id
 
-  # ----------------------------------------------------------------------------------------------
   # File Share Configuration
-  # ----------------------------------------------------------------------------------------------
-  # - Minimum capacity for Basic Filestore is 1 TB (1024 GiB).
-  # - Export options define client access mode, root squash, and allowed IP ranges.
+  # - Minimum capacity for Basic = 1024 GiB
   file_shares {
-    capacity_gb = 1024 # 1 TB minimum
+    capacity_gb = 1024       # 1 TB minimum
     name        = "filestore"
 
     nfs_export_options {
-      access_mode = "READ_WRITE"     # Allow read/write access
-      squash_mode = "NO_ROOT_SQUASH" # Preserve root privileges on clients
-      ip_ranges   = ["0.0.0.0/0"]    # ⚠️ Lab only; restrict in production
+      access_mode = "READ_WRITE"     # Read/write access
+      squash_mode = "NO_ROOT_SQUASH" # Preserve root privileges
+      ip_ranges   = ["0.0.0.0/0"]    # Lab only; restrict in production
     }
   }
 
-  # ----------------------------------------------------------------------------------------------
-  # Network Configuration
-  # ----------------------------------------------------------------------------------------------
-  # - Attaches Filestore to the specified VPC network.
-  # - Modes set to IPv4 only (default for most labs).
+  # Network Attachment
   networks {
-    network = data.google_compute_network.ad_vpc.name
-    modes   = ["MODE_IPV4"]
+    network = data.google_compute_network.ad_vpc.name # Attach to AD VPC
+    modes   = ["MODE_IPV4"]                           # IPv4 mode
   }
 }
 
-# ================================================================================================
+
+# ==============================================================================
 # Firewall Rule: Allow NFS Traffic
-# ================================================================================================
-# Grants network access to NFS port (2049) over both TCP and UDP.
-#
-# Key Points:
-#   - Required for Linux clients to mount Filestore over NFS.
-#   - Source range is wide open (0.0.0.0/0) for lab use.
-#   - In production, restrict to specific subnets or client ranges.
-# ================================================================================================
+# ------------------------------------------------------------------------------
+# Purpose:
+#   - Allow inbound NFS (2049) over TCP and UDP
+#   - Required for Linux clients mounting Filestore
+# ==============================================================================
+
 resource "google_compute_firewall" "allow_nfs" {
-  name    = "allow-nfs"
+  name    = "rstudio-allow-nfs"
   network = data.google_compute_network.ad_vpc.name
 
   allow {
@@ -78,15 +64,18 @@ resource "google_compute_firewall" "allow_nfs" {
     ports    = ["2049"]
   }
 
-  source_ranges = ["0.0.0.0/0"] # ⚠️ Lab only; tighten to your subnet CIDR in production
+  source_ranges = ["0.0.0.0/0"] # Lab only; restrict to subnet in production
 }
 
-# ================================================================================================
-# Output: Filestore IP Address
-# ================================================================================================
-# Exposes the Filestore instance’s private IP address for use in mount commands.
-# Example mount path: <IP_ADDRESS>:/filestore
-# ================================================================================================
+
+# ==============================================================================
+# Output: Filestore IP Address (Optional)
+# ------------------------------------------------------------------------------
+# Purpose:
+#   - Expose private IP for mount commands
+#   - Example: <IP_ADDRESS>:/filestore
+# ==============================================================================
+
 # output "filestore_ip" {
 #   value = google_filestore_instance.nfs_server.networks[0].ip_addresses[0]
 # }
