@@ -1,195 +1,152 @@
-# GCP RStudio Cluster with Filestore-Backed Shared Libraries  
+# RStudio Server Cluster on GCP: Managed Instance Group, Filestore and Active Directory
 
-This project extends the original **GCP Mini Active Directory** lab by deploying an **RStudio Server cluster** on Google Cloud Platform. The cluster is designed for data science and analytics workloads, where multiple users need a scalable, domain-joined environment with consistent package management.  
+An **RStudio Server** cluster for shared data-science work, built on the
+[GCP Mini Active Directory](https://github.com/mamonaco1973/gcp-mini-ad) lab.
+A global **HTTP load balancer** spreads users across a **managed instance
+group** of RStudio VMs built from a **Packer** image; every VM joins a
+**mini-AD** domain, so users sign in with their AD accounts, and mounts the
+same **Filestore** share for home directories, shared data and a shared R
+package library. A Windows VM and a Samba gateway give admins access to the
+same files.
 
-![RStudio](rstudio.png)  
+![RStudio Server](rstudio.png)
 
-Instead of relying only on per-user libraries stored on ephemeral VM disks, this solution integrates **Google Cloud Filestore** as a shared package and data backend. This allows RStudio nodes in a **Managed Instance Group (MIG)** to mount a common NFS share, ensuring that installed R packages and project files are accessible across all nodes.  
+| Piece | Where | Role |
+|---|---|---|
+| **rstudio-alb** | global | external HTTP load balancer on the static IP `rstudio-lb-ip`, port 80; backend service with generated-cookie affinity for a day; health check `/auth-sign-in` on 8787 |
+| **rstudio-instance-group** | regional MIG, `us-central1` | `e2-standard-2` VMs from `rstudio-template`, 2 to 4, scaled at 60% CPU with a 300 s cooldown; named port `http` = 8787 |
+| **RStudio image** | built by Packer | Ubuntu 24.04 with R, RStudio Server (open source) and SSSD/realmd; `apply.sh` picks the newest by name |
+| **rstudio-nfs-server** | Filestore, `us-central1-a` | BASIC_HDD, 1 TB share `filestore`, mounted over NFSv3 |
+| **nfs-gateway-&lt;suffix&gt;** | `us-central1-a` | Ubuntu 24.04, `e2-standard-2`; joined to AD; mounts the share and serves `/nfs` over Samba |
+| **win-ad-&lt;suffix&gt;** | `us-central1-a` | Windows Server 2022, `e2-standard-2`; joined to AD; RSAT; maps the gateway's share as `Z:` |
+| **mini-AD** | subnet `10.1.0.0/24` | [`module-gcp-mini-ad`](https://github.com/mamonaco1973/module-gcp-mini-ad) Samba DC (`e2-medium`) for `rstudio.mikecloud.com` (`RSTUDIO`); users, groups, POSIX IDs, DNS, Kerberos |
+| **Secret Manager** | project | `admin-ad-credentials-rstudio`, one `*-ad-credentials-rstudio` secret per user, and the Windows `sysadmin` password |
+| **rstudio-router** / **rstudio-nat** | `us-central1` | Cloud NAT for outbound traffic |
 
-### Key capabilities demonstrated:  
+## Architecture
 
-1. **RStudio Server Cluster with Global HTTP Load Balancer** – RStudio Server (Open Source Edition) deployed across multiple Compute Engine instances, fronted by a GCP global HTTP(S) load balancer for high availability and seamless user access.  
-2. **Filestore-Backed Shared Library** – Filestore NFS share mounted at `/nfs/rlibs` and injected into `.libPaths()`, enabling shared R package storage across the cluster.  
-3. **Mini Active Directory Integration** – A Samba-based mini-AD domain controller provides authentication and DNS, so RStudio logins are domain-based and centrally managed.  
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="architecture-dark.svg">
+  <img alt="RStudio users reach rstudio-alb, a global external HTTP load balancer on port 80 with generated-cookie session affinity, which forwards to port 8787 on rstudio-instance-group, a regional managed instance group of two to four e2-standard-2 VMs built from a Packer image and scaled at 60% CPU. Each VM reads the AD join password from Secret Manager, joins the mini-AD Samba domain controller with SSSD, and mounts the rstudio-nfs-server Filestore share over NFSv3 for /home and the shared R library /nfs/rlibs. Administrators RDP to the Windows admin VM, which maps the NFS gateway's SMB share as drive Z:; the gateway mounts the same share and is also joined to the domain." src="architecture-light.svg">
+</picture>
 
-Together, this architecture provides a reproducible, cloud-native RStudio environment where users get both personal home-directory libraries and access to a shared, scalable package repository.  
+Regenerate with `python3 make_diagram.py`. The gateway and Windows VM also
+join the domain; those lines are left off the diagram to keep it readable.
 
-![GCP RStudio Cluster](gcp-rstudio-cluster.png)  
+- **`01-directory/`**: the VPC, subnet and Cloud NAT, the passwords in
+  Secret Manager, and the mini-AD DC with users and groups from
+  `scripts/users.json.template`.
+- **`02-servers/`**: Filestore, the gateway and Windows VMs, and their
+  firewall rules.
+- **`03-packer/`**: the RStudio image (`rstudio_image.pkr.hcl` and its
+  install scripts).
+- **`04-cluster/`**: the instance template, managed instance group and
+  autoscaler, and the load balancer (`alb.tf`).
+- **`05-rsamples/`**: sample R scripts and `packages.R`.
+- **`06-utils/`**: `getNextUID` / `getNextGID` scripts for adding AD users.
+
+## How a VM starts
+
+`rstudio_booter.sh` mounts the share's root as `/nfs` and its `home`
+directory as `/home`, creates `/nfs/home`, `/nfs/data` and `/nfs/rlibs`,
+reads the AD admin password from Secret Manager, joins the domain with
+`realm join` (SSSD with short names and the POSIX IDs from AD), gives
+`linux-admins` passwordless sudo, and writes `Rprofile.site` so the library
+path is the user's own library, then `/nfs/rlibs`, then the system library.
+`/nfs/rlibs` belongs to `rstudio-admins`.
+
+## Users and groups
+
+| User | uidNumber | Groups | Notes |
+|---|---|---|---|
+| jsmith | 10001 | rstudio-users, us, linux-admins, rstudio-admins, Domain Admins | sudo; writes `/nfs/rlibs` |
+| edavis | 10002 | rstudio-users, us | |
+| rpatel | 10003 | rstudio-users, india, linux-admins, rstudio-admins, Domain Admins | sudo; writes `/nfs/rlibs` |
+| akumar | 10004 | rstudio-users, india | |
+
+| Group | gidNumber |
+|---|---|
+| rstudio-users | 10001 (every user's primary group) |
+| us | 10002 |
+| india | 10003 |
+| linux-admins | 10004 |
+| rstudio-admins | 10005 |
 
 ## Prerequisites
 
 * [A Google Cloud Account](https://console.cloud.google.com/)
-* [Install gcloud CLI](https://cloud.google.com/sdk/docs/install) 
-* [Install Latest Terraform](https://developer.hashicorp.com/terraform/install)
-* [Install Latest Packer](https://developer.hashicorp.com/packer/install)
+* [Install gcloud CLI](https://cloud.google.com/sdk/docs/install)
+* [Install Terraform](https://developer.hashicorp.com/terraform/install)
+* [Install Packer](https://developer.hashicorp.com/packer/install)
+* [Install jq](https://jqlang.github.io/jq/download/)
 
-If this is your first time watching our content, we recommend starting with this video: [GCP + Terraform: Easy Setup](https://youtu.be/3spJpYX4f7I). It provides a step-by-step guide to properly configure Terraform, Packer, and the gcloud CLI.
+Put a service account key in the repository root as `credentials.json`. If
+this is your first time watching our content, we recommend starting with
+this video: [GCP + Terraform: Easy Setup](https://youtu.be/3spJpYX4f7I).
 
-## Build WorkFlow
-
-![Build WorkFlow](build-workflow.png)
-
-## Download this Repository  
-
-Clone the repository from GitHub and move into the project directory:  
+## Deploy
 
 ```bash
 git clone https://github.com/mamonaco1973/gcp-rstudio-cluster.git
 cd gcp-rstudio-cluster
-```  
+./apply.sh
+```
 
+`check_env.sh` signs in with `credentials.json` and runs `api_setup.sh` to
+enable the APIs. `apply.sh` applies `01-directory` and `02-servers`, builds
+the RStudio image with Packer, and applies `04-cluster` with the newest
+image. It ends by running `validate.sh`, which waits for the load balancer
+to return HTTP 200 on `/auth-sign-in`:
 
-## Build the Code  
+```
+============================================================================
+RStudio Quick Start - Validation Output (GCP)
+============================================================================
 
-Run [check_env](check_env.sh) to validate your environment, then run [apply](apply.sh) to provision the infrastructure.  
+NOTE: NFS Gateway Host:      34.x.x.x
+NOTE: Windows RDP Host:      34.x.x.x
 
-```bash
-develop-vm:~/gcp-rstudio-cluster$ ./apply.sh
-NOTE: Validating that required commands are in PATH.
-NOTE: gcloud is found in the current PATH.
-NOTE: terraform is found in the current PATH.
-NOTE: All required commands are available.
-NOTE: Checking Google Cloud CLI connection.
-NOTE: Successfully authenticated with GCP.
-Initializing provider plugins...
-Terraform has been successfully initialized!
-```  
-## Build Results  
+NOTE: RStudio URL:           http://<lb IP>
+```
 
-When the deployment completes, the following resources are created:  
+## Try it
 
-- **Networking:**  
-  - A custom VPC with dedicated subnets for Active Directory, MIG cluster nodes, and NFS Gateway.  
-  - Route tables and firewall rules configured for outbound internet access, AD lookups, and Filestore access  
+1. Open the **RStudio URL** and sign in as one of the users above, with the
+   password from its `*-ad-credentials-rstudio` secret.
+2. Open a sample from `05-rsamples`; the gateway clones this repository
+   into the share.
+3. Add a user:
+   1. RDP to the **Windows RDP Host** as `jsmith` or `rpatel` and open
+      **Active Directory Users and Computers** with **View > Advanced
+      Features** on.
+   2. Under the domain's **Users** container, create the user with a UPN
+      such as `mcloud@rstudio.mikecloud.com` and an initial password.
 
-- **Security & Identity:**  
-  - Firewall rules scoped to domain controller, MIG nodes, and NFS gateway  
-  - Google Secret Manager entries for administrator and user credentials  
-  - Service accounts and IAM roles for MIG instances to securely fetch secrets  
+      ![New user in Active Directory Users and Computers](windows.png)
 
-- **Active Directory Server:**  
-  - Ubuntu VM running Samba 4 as Domain Controller and DNS server  
-  - Configured Kerberos realm and NetBIOS name for authentication  
-  - Administrator credentials securely stored in Secret Manager  
+   3. Run `Z:\gcp-rstudio-cluster\06-utils\getNextUID.bat` for the next
+      free `uidNumber`.
+   4. In **Attribute Editor**, set `uidNumber` to that value, `gidNumber` to
+      `10001`, and `uid` to the login name.
+   5. Under **Member Of**, add `rstudio-users` and any other groups.
+   6. SSH to the **NFS Gateway Host** and check the mapping with
+      `id mcloud`:
 
-- **RStudio Cluster (MIG):**  
-  - Linux Managed Instance Group (MIG) hosting RStudio Server nodes built from a Packer-generated custom image  
-  - Global HTTP(S) Load Balancer providing public access, load balancing, health checks, and optional session affinity  
-  - Autoscaling policies to add/remove RStudio nodes based on CPU utilization  
+      ![id output on the Linux gateway](linux.png)
 
-- **Filestore Storage:**  
-  - Google Cloud Filestore instance providing an NFSv3 share  
-  - Mounted at `/nfs/rlibs` for shared R libraries and optionally `/nfs/home` for user home directories  
+   7. Sign in to RStudio as the new user. They can't write `/nfs/rlibs`
+      until they're in `rstudio-admins`.
 
-- **File Access Integration:**  
-  - RStudio MIG instances mount the Filestore NFS share for shared R libraries and project data  
-  - A Linux gateway can optionally expose the same Filestore backend via Samba for Windows clients  
-  - This provides a unified storage backend across Linux (NFS) and Windows (SMB) clients  
-
-- **Sample R Workloads:**  
-  - Example R scripts (Monte Carlo, bell curve, surface plotting, etc.) included to validate the environment  
-
-## Users and Groups
-
-The domain controller provisions **sample users and groups** via Terraform templates. These are intended for testing and demonstration.  
-
-### Groups Created  
-
-| Group Name    | Category  | Scope     | gidNumber |
-|---------------|-----------|----------|-----------|
-| rstudio-users  | Security  | Universal | 10001 |
-| india         | Security  | Universal | 10002 |
-| us            | Security  | Universal | 10003 |
-| linux-admins  | Security  | Universal | 10004 |
-| rstudio-admins  | Security  | Universal | 10005 |
-
-### Users Created  
-
-| Username | Full Name   | uidNumber | gidNumber | Groups Joined                    |
-|----------|-------------|-----------|-----------|----------------------------------|
-| jsmith   | John Smith  | 10001     | 10001     | rstudio-users, us, linux-admins, rstudio-admins  |
-| edavis   | Emily Davis | 10002     | 10001     | rstudio-users, us                 |
-| rpatel   | Raj Patel   | 10003     | 10001     | rstudio-users, india, linux-admins, rstudio-admins|
-| akumar   | Amit Kumar  | 10004     | 10001     | rstudio-users, india              |
-
-
-### Understanding `uidNumber` and `gidNumber` for Linux Integration
-
-The **`uidNumber`** (User ID) and **`gidNumber`** (Group ID) attributes are critical when integrating **Active Directory** with **Linux systems**, particularly in environments where **SSSD** ([System Security Services Daemon](https://sssd.io/)) or similar services are used for identity management. These attributes allow Linux hosts to recognize and map Active Directory users and groups into the **POSIX** (Portable Operating System Interface) user and group model.
-
-### Creating a New RStudio User
-
-Follow these steps to provision a new user in the Active Directory domain and validate their access to the RStudio cluster:
-
-1. **Connect to the Domain Controller**  
-   - Log into the **`win-ad-xxxx`** server via a **RDP** client
-   - Use the `rpatel` or `jsmith` credentials that were provisioned during cluster deployment.  
-
-2. **Launch Active Directory Users and Computers (ADUC)**  
-   - From the Windows Start menu, open **“Active Directory Users and Computers.”**  
-   - Enable **Advanced Features** under the **View** menu. This ensures you can access the extended attribute tabs (e.g., UID/GID mappings).  
-
-3. **Navigate to the Users Organizational Unit (OU)**  
-   - In the left-hand tree, expand the domain (e.g., `rstudio.mikecloud.com`).  
-   - Select the **Users** OU where all cluster accounts are managed.  
-
-4. **Create a New User Object**  
-   - Right-click the Users OU and choose **New → User.**  
-   - Provide the following:  
-     - **Full Name:** Descriptive user name (e.g., “Mike Cloud”).  
-     - **User Logon Name (User Principal Name / UPN):** e.g., `mcloud@rstudio.mikecloud.com`.  
-     - **Initial Password:** Set an initial password.
-
-![Windows](windows.png)
-
-5. **Assign a Unique UID Number**  
-   - Open **PowerShell** on the AD server.  
-   - Run the script located at:  
-     ```powershell
-     Z:\nfs\gcp-rstudio-cluster\06-utils\getNextUID.bat
-     ```  
-   - This script returns the next available **`uidNumber`** to assign to the new account.  
-
-6. **Configure Advanced Attributes**  
-   - In the new user’s **Properties** dialog, open the **Attribute Editor** tab.  
-   - Set the following values:  
-     - `gidNumber` → **10001** (the shared GID for the `rstudio-users` group).  
-     - `uid` → match the user’s AD login ID (e.g., `rpatel`).  
-     - `uidNumber` → the unique numeric value returned from `getNextUID.ps1`.  
-
-7. **Add Group Memberships**  
-   - Go to the **Member Of** tab.  
-   - Add the user to the following groups:  
-     - **rstudio-users** → grants standard RStudio access.  
-     - **us** (or other geographic/departmental group as applicable).  
-
-8. **Validate User on Linux**  
-   - Open an **SSH** session to the **`nfs-gateway-xxxx`** instance.  
-   - Run the following command to confirm the user’s identity mapping:  
-     ```bash
-     id mcloud
-     ```  
-   - Verify that the output shows the correct **UID**, **GID**, and group memberships (e.g., `rstudio-users`).  
-
-![Linux](linux.png)
-
-9. **Validate RStudio Access**  
-   - Open the RStudio cluster’s Application Gateway's URL in a browser (e.g., `http://34.173.20.15/`).  
-   - Log in with the new AD credentials.  
-
-10. **Verify Permissions**  
-   - By default, the new user is **not** a member of the `rstudio-admin` group.  
-   - Attempting to install packages into the **shared library path `/nfs/rlibs`** should fail with a **“Permission denied”** error.  
-   - This confirms the user is restricted to installing packages in their **personal user library** only.  
-
----
-
-✅ **Note:** If you need the user to have administrative rights (e.g., the ability to install packages into the shared library), add them to the **rstudio-admin** group in addition to `rstudio-users`.
-
-### Clean Up  
-
-When finished, remove all resources with:  
+## Teardown
 
 ```bash
 ./destroy.sh
-```  
+```
+
+## Notes
+
+- **Lab only.** RStudio is served over plain HTTP. Firewall rules open SSH
+  (22), SMB (445), RDP (3389), NFS (2049) and 8787/80 on the RStudio VMs to
+  `0.0.0.0/0`.
+- The old README listed `india` as 10002 and `us` as 10003; the template
+  sets `us` to 10002 and `india` to 10003.
